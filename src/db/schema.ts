@@ -1,7 +1,7 @@
 import { relations } from "drizzle-orm";
 import {
   pgTable, text, timestamp, boolean, index,
-  integer, bigint, jsonb, uniqueIndex, smallint,
+  integer, doublePrecision, jsonb, uniqueIndex, smallint,
 } from "drizzle-orm/pg-core";
 
 export const user = pgTable("user", {
@@ -92,7 +92,7 @@ export const game = pgTable(
     stimuliCount: smallint("stimuli_count").notNull().default(20),
     initialIntervalMs: integer("initial_interval_ms").notNull().default(2500),
     sequence: jsonb("sequence").$type<number[]>(),
-    startedAt: bigint("started_at", { mode: "number" }),
+    startedAt: doublePrecision("started_at"),
     speedChanges: jsonb("speed_changes")
       .$type<SpeedChange[]>()
       .notNull()

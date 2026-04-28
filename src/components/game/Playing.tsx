@@ -32,7 +32,8 @@ interface PlayingProps {
 export function Playing({ game, currentUserId }: PlayingProps) {
   const router = useRouter();
   const [stimIdx, setStimIdx] = useState(-1);
-  // ref for latest game data so the interval always reads fresh values
+  // ref mirrors stimIdx so the interval can read current index without closures
+  const stimIdxRef = useRef(-1);
   const gameRef = useRef(game);
   useEffect(() => { gameRef.current = game; }, [game]);
 
@@ -47,24 +48,29 @@ export function Playing({ game, currentUserId }: PlayingProps) {
       });
     },
   });
+  const submitMutationRef = useRef(submitMutation);
+  useEffect(() => { submitMutationRef.current = submitMutation; }, [submitMutation]);
 
   useEffect(() => {
     const tick = () => {
       const g = gameRef.current;
       if (!g.startedAt || !g.sequence) return;
 
+      const startedAt = Number(g.startedAt);
+      const now = Date.now();
       const idx = computeCurrentStimulusIndex(
-        g.startedAt,
+        startedAt,
         g.initialIntervalMs,
         g.speedChanges,
         g.stimuliCount,
-        Date.now(),
+        now,
       );
 
-      setStimIdx((prev) => {
-        if (idx !== prev && prev >= 0 && lastSubmittedRef.current < prev) {
+      const prev = stimIdxRef.current;
+      if (idx !== prev) {
+        if (prev >= 0 && lastSubmittedRef.current < prev) {
           lastSubmittedRef.current = prev;
-          submitMutation.mutate({
+          submitMutationRef.current.mutate({
             gameId: g.id,
             stimulusIndex: prev,
             pressed: pressedRef.current,
@@ -72,22 +78,17 @@ export function Playing({ game, currentUserId }: PlayingProps) {
           pressedRef.current = false;
           setPressedVisual(false);
         }
-        return idx;
-      });
+        stimIdxRef.current = idx;
+        setStimIdx(idx);
+      }
 
       if (
         idx === g.stimuliCount - 1 &&
         lastSubmittedRef.current < idx &&
-        isGameOver(
-          g.startedAt,
-          g.initialIntervalMs,
-          g.speedChanges,
-          g.stimuliCount,
-          Date.now(),
-        )
+        isGameOver(startedAt, g.initialIntervalMs, g.speedChanges, g.stimuliCount, now)
       ) {
         lastSubmittedRef.current = idx;
-        submitMutation.mutate({
+        submitMutationRef.current.mutate({
           gameId: g.id,
           stimulusIndex: idx,
           pressed: pressedRef.current,

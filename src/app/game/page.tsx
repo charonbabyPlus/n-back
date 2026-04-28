@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { db } from "@/db/drizzle";
 import { game } from "@/db/schema";
 import { Button } from "@/components/ui/button";
+import { AutoRefresh } from "@/components/auto-refresh";
 
 async function requireSession() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -26,56 +27,134 @@ export default async function GameListPage() {
   });
 
   return (
-    <div className="max-w-lg mx-auto p-6 flex flex-col gap-6">
-      <div className="flex items-center justify-between">
-        <h1 className="text-2xl font-bold">N-back Multiplayer</h1>
+    <div className="max-w-2xl mx-auto p-6 flex flex-col gap-8">
+      <AutoRefresh intervalMs={5000} />
+
+      <div className="flex items-center gap-3">
+        <Button asChild variant="ghost" size="sm" className="-ml-2">
+          <Link href="/dashboard">← Back</Link>
+        </Button>
+        <div className="ml-auto" />
         <form action="/game/create" method="post">
-          <Button type="submit">New Game</Button>
+          <Button type="submit">+ New Game</Button>
         </form>
       </div>
 
-      {games.length === 0 && (
-        <p className="text-muted-foreground text-sm">
-          No open games. Create one!
+      <div className="flex flex-col gap-2">
+        <h1 className="text-3xl font-bold tracking-tight">Multiplayer Lobby</h1>
+        <p className="text-sm text-muted-foreground">
+          Join an open game or create your own. Games start when the host has
+          at least 2 players.
         </p>
+      </div>
+
+      {games.length === 0 ? (
+        <div className="rounded-xl border border-dashed p-10 flex flex-col items-center gap-3 text-center">
+          <div className="size-12 rounded-full bg-muted flex items-center justify-center text-2xl">
+            ◯
+          </div>
+          <p className="font-medium">No open games right now</p>
+          <p className="text-sm text-muted-foreground max-w-xs">
+            Be the first to create a game. Others will see it here and can
+            join.
+          </p>
+        </div>
+      ) : (
+        <div className="flex flex-col gap-3">
+          <div className="flex items-center justify-between text-xs text-muted-foreground uppercase tracking-wider px-1">
+            <span>{games.length} open {games.length === 1 ? "game" : "games"}</span>
+            <span className="flex items-center gap-1.5">
+              <span className="size-1.5 rounded-full bg-green-500 animate-pulse" />
+              live
+            </span>
+          </div>
+          {games.map((g) => {
+            const isHost = g.hostId === session.user.id;
+            const isJoined = g.players.some((p) => p.userId === session.user.id);
+            const isFull = g.players.length >= 4;
+            return (
+              <div
+                key={g.id}
+                className="rounded-xl border bg-card p-4 flex flex-col gap-4 transition-colors hover:border-foreground/20"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="flex items-center gap-3 min-w-0">
+                    <div className="size-10 shrink-0 rounded-full bg-linear-to-br from-blue-500/20 to-purple-500/20 flex items-center justify-center text-sm font-semibold">
+                      {g.host.name.charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex flex-col gap-0.5 min-w-0">
+                      <span className="text-sm font-medium truncate">
+                        {g.host.name}&apos;s game
+                        {isHost && (
+                          <span className="ml-2 text-xs font-normal text-muted-foreground">
+                            (you host)
+                          </span>
+                        )}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        n={g.nValue} · {g.stimuliCount} stimuli ·{" "}
+                        {g.initialIntervalMs / 1000}s/stim
+                      </span>
+                    </div>
+                  </div>
+
+                  {isHost ? (
+                    <form action="/game/dissolve" method="post">
+                      <input type="hidden" name="gameId" value={g.id} />
+                      <Button size="sm" variant="outline" type="submit">
+                        Dissolve
+                      </Button>
+                    </form>
+                  ) : isJoined ? (
+                    <Button asChild size="sm">
+                      <Link href={`/game/${g.id}`}>Open</Link>
+                    </Button>
+                  ) : (
+                    <form action="/game/join" method="post">
+                      <input type="hidden" name="gameId" value={g.id} />
+                      <Button size="sm" type="submit" disabled={isFull}>
+                        {isFull ? "Full" : "Join"}
+                      </Button>
+                    </form>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <div className="flex -space-x-2">
+                    {g.players.map((p) => (
+                      <div
+                        key={p.userId}
+                        title={p.user.name}
+                        className={[
+                          "size-7 rounded-full border-2 border-background flex items-center justify-center text-xs font-medium",
+                          p.userId === g.hostId
+                            ? "bg-yellow-400/30 text-yellow-700 dark:text-yellow-300"
+                            : "bg-green-400/30 text-green-700 dark:text-green-300",
+                        ].join(" ")}
+                      >
+                        {p.user.name.charAt(0).toUpperCase()}
+                      </div>
+                    ))}
+                    {Array.from({ length: 4 - g.players.length }).map((_, i) => (
+                      <div
+                        key={`empty-${i}`}
+                        className="size-7 rounded-full border-2 border-dashed border-muted-foreground/30 bg-background"
+                      />
+                    ))}
+                  </div>
+                  <span className="text-xs text-muted-foreground ml-auto tabular-nums">
+                    {g.players.length}/4 players
+                  </span>
+                </div>
+              </div>
+            );
+          })}
+        </div>
       )}
 
-      <div className="flex flex-col gap-3">
-        {games.map((g) => (
-          <div
-            key={g.id}
-            className="flex items-center justify-between rounded-lg border p-4"
-          >
-            <div className="flex flex-col gap-0.5">
-              <span className="text-sm font-medium">{g.host.name}&apos;s game</span>
-              <span className="text-xs text-muted-foreground">
-                {g.players.length}/4 players · n={g.nValue} · {g.stimuliCount} stimuli
-              </span>
-            </div>
-            {g.hostId === session.user.id ? (
-              <form action="/game/dissolve" method="post">
-                <input type="hidden" name="gameId" value={g.id} />
-                <Button size="sm" variant="outline" type="submit">
-                  Dissolve
-                </Button>
-              </form>
-            ) : (
-              <form action="/game/join" method="post">
-                <input type="hidden" name="gameId" value={g.id} />
-                <Button size="sm" variant="outline" type="submit">
-                  Join
-                </Button>
-              </form>
-            )}
-          </div>
-        ))}
-      </div>
-
-      <div>
-        <Button asChild variant="ghost" size="sm">
-          <Link href="/game">Refresh</Link>
-        </Button>
-      </div>
+      <p className="text-xs text-muted-foreground text-center">
+        Auto-refreshing every 5 seconds
+      </p>
     </div>
   );
 }

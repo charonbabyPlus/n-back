@@ -36,12 +36,14 @@ export async function submitAnswerForPlayer({
   }
 
   if (currentGame.status !== "playing") {
-    throw new TRPCError({ code: "BAD_REQUEST", message: "Game not in progress" });
+    return { correct: false, speedChanged: false, gameFinished: true };
   }
 
   if (!currentGame.sequence || currentGame.startedAt == null) {
     throw new TRPCError({ code: "INTERNAL_SERVER_ERROR" });
   }
+
+  const startedAt = Number(currentGame.startedAt);
 
   const player = currentGame.players.find((item) => item.userId === userId);
   if (!player) {
@@ -69,7 +71,7 @@ export async function submitAnswerForPlayer({
       correct,
     });
   } catch {
-    return { correct, speedChanged: false };
+    return { correct, speedChanged: false, gameFinished: false };
   }
 
   const newErrorCount = player.errorCount + (correct ? 0 : 1);
@@ -114,22 +116,22 @@ export async function submitAnswerForPlayer({
       .where(eq(gamePlayers.id, player.id));
   }
 
-  if (
-    isGameOver(
-      currentGame.startedAt,
-      currentGame.initialIntervalMs,
-      latestSpeedChanges,
-      currentGame.stimuliCount,
-      Date.now(),
-    )
-  ) {
+  const gameFinished = isGameOver(
+    startedAt,
+    currentGame.initialIntervalMs,
+    latestSpeedChanges,
+    currentGame.stimuliCount,
+    Date.now(),
+  );
+
+  if (gameFinished) {
     await databaseClient
       .update(game)
       .set({ status: "finished", finishedAt: new Date() })
       .where(eq(game.id, gameId));
   }
 
-  return { correct, speedChanged: triggerChange };
+  return { correct, speedChanged: triggerChange, gameFinished };
 }
 
 export async function catchUpMissedAnswers({
@@ -164,8 +166,10 @@ export async function catchUpMissedAnswers({
     return;
   }
 
+  const startedAt = Number(currentGame.startedAt);
+
   const currentIndex = computeCurrentStimulusIndex(
-    currentGame.startedAt,
+    startedAt,
     currentGame.initialIntervalMs,
     currentGame.speedChanges,
     currentGame.stimuliCount,
@@ -173,7 +177,7 @@ export async function catchUpMissedAnswers({
   );
 
   const finished = isGameOver(
-    currentGame.startedAt,
+    startedAt,
     currentGame.initialIntervalMs,
     currentGame.speedChanges,
     currentGame.stimuliCount,
@@ -198,12 +202,14 @@ export async function catchUpMissedAnswers({
       continue;
     }
 
-    await submitAnswerForPlayer({
+    const result = await submitAnswerForPlayer({
       database: databaseClient,
       gameId,
       userId,
       stimulusIndex: index,
       pressed: false,
     });
+
+    if (result.gameFinished) break;
   }
 }
