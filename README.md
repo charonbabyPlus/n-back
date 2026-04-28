@@ -45,34 +45,45 @@
 
 ## Структура проекта
 
+Организация **по фичам**, с явным разделением на `client/`, `server/` и `shared/` внутри каждой фичи. Это сразу говорит, что куда можно импортировать (например, `shared/` — пуристая логика без БД и React).
+
 ```
 src/
-├── app/
-│   ├── dashboard/           # Главная после входа
-│   ├── solo/                # Одиночная тренировка
-│   ├── game/                # Мультиплеер: список лобби, [gameId]
-│   ├── history/             # История мультиплеер-матчей
-│   ├── leaderboard/         # Таблица лидеров по winrate
-│   ├── login/, signup/      # Страницы аутентификации
-│   └── api/{auth,trpc}/     # API-роуты
-├── components/
-│   ├── game/                # SoloGame, Playing, Grid, Scoreboard, ...
-│   └── ui/                  # shadcn-компоненты
-├── server/
-│   ├── routers/game.ts      # tRPC роутер
-│   ├── game-service.ts      # submitAnswerForPlayer, catchUpMissedAnswers
-│   └── trpc.ts              # protectedProcedure, контекст
-├── game/                    # Чистая бизнес-логика
-│   ├── sequence.ts          # generateSequence, computeCurrentStimulusIndex, isGameOver
-│   └── scoring.ts           # evaluateAnswer, shouldTriggerSpeedChange, computeNextIntervalMs
-├── db/                      # Drizzle: schema, drizzle client
-└── lib/                     # auth, trpc-client, утилиты
-tests/                       # Юнит-тесты бизнес-логики (Vitest)
+├── app/                          # Тонкий слой роутинга
+│   ├── (auth)/login/, signup/    # route group для страниц аутентификации
+│   ├── dashboard/                # Главная после входа
+│   ├── solo/                     # Одиночная тренировка
+│   ├── game/, game/[gameId]/     # Мультиплеер: список лобби и страница матча
+│   ├── history/                  # История мультиплеер-матчей
+│   ├── leaderboard/              # Таблица лидеров по winrate
+│   └── api/{auth,trpc}/          # better-auth и tRPC handlers
+├── features/                     # Фичи проекта
+│   ├── game/
+│   │   ├── client/               # Playing, SoloGame, Grid, Scoreboard
+│   │   ├── server/
+│   │   │   ├── service.ts        # submitAnswerForPlayer, catchUpMissedAnswers
+│   │   │   ├── actions.ts        # Server Actions: createGame, joinGame, startGame, …
+│   │   │   └── router.ts         # tRPC роутер для game
+│   │   └── shared/               # Чистая бизнес-логика без зависимостей
+│   │       ├── sequence.ts       # generateSequence, computeCurrentStimulusIndex, isGameOver
+│   │       └── scoring.ts        # evaluateAnswer, shouldTriggerSpeedChange, computeNextIntervalMs
+│   └── auth/
+│       ├── client/               # login-form, signup-form
+│       └── server/               # auth.ts (better-auth setup), actions.ts (signIn/signUp)
+├── lib/
+│   ├── trpc/                     # client.ts, server.ts (контекст), provider.tsx, router.ts
+│   ├── db/                       # drizzle.ts (клиент), schema.ts
+│   └── utils.ts                  # cn() и др.
+└── components/
+    ├── ui/                       # shadcn primitives — generic, не привязаны к фичам
+    └── auto-refresh.tsx          # Утилита-компонент для router.refresh() по таймеру
+
+tests/                            # Юнит-тесты бизнес-логики (Vitest)
 ```
 
 ## Бизнес-логика
 
-Вся игровая логика вынесена в чистые функции в `src/game/` — без зависимостей от React, БД и сети. Это позволяет:
+Вся игровая логика вынесена в чистые функции в `src/features/game/shared/` — без зависимостей от React, БД и сети. Это позволяет:
 - Использовать одни и те же функции на сервере (валидация ответов) и клиенте (отображение текущего стимула)
 - Покрыть всё юнит-тестами без моков
 
@@ -140,15 +151,15 @@ npm test            # один прогон
 npm run test:watch  # watch-режим
 ```
 
-Покрыты все чистые функции из `src/game/` — включая краевые случаи (n=1, изменения скорости, разрывы по времени).
+Покрыты все чистые функции из `src/features/game/shared/` — включая краевые случаи (n=1, изменения скорости, разрывы по времени).
 
 ## Соответствие обязательным требованиям
 
-| Требование                                              | Где                                                            |
-| ------------------------------------------------------- | -------------------------------------------------------------- |
-| Серверная генерация последовательности                  | `src/game/sequence.ts` → `/game/start`, `/solo`                |
-| Проверка ответов через защищённые процедуры             | `src/server/routers/game.ts` → `protectedProcedure submitAnswer` |
-| Влияние ошибок одного игрока на всех                    | `shouldTriggerSpeedChange` + `speed_changes` в БД              |
-| Поддержка нескольких игроков                            | Лобби до 4 игроков, общая последовательность, общий тайминг    |
-| Хранение результатов                                    | Таблицы `game_players`, `stimulus_answers`                     |
-| Тестирование бизнес-логики                              | `tests/scoring.test.ts`, `tests/sequence.test.ts` (22 теста)   |
+| Требование                                              | Где                                                                              |
+| ------------------------------------------------------- | -------------------------------------------------------------------------------- |
+| Серверная генерация последовательности                  | `features/game/shared/sequence.ts` → вызов из `actions.ts` (startGame) и `app/solo/page.tsx` |
+| Проверка ответов через защищённые процедуры             | `features/game/server/router.ts` → `protectedProcedure submitAnswer`             |
+| Влияние ошибок одного игрока на всех                    | `shouldTriggerSpeedChange` + `speed_changes` в БД                                |
+| Поддержка нескольких игроков                            | Лобби до 4 игроков, общая последовательность, общий тайминг                      |
+| Хранение результатов                                    | Таблицы `game_players`, `stimulus_answers`                                       |
+| Тестирование бизнес-логики                              | `tests/scoring.test.ts`, `tests/sequence.test.ts` (22 теста)                     |

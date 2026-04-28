@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
+import { auth } from "@/features/auth/server/auth";
 import Link from "next/link";
 
 export default async function Dashboard() {

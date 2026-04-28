@@ -2,9 +2,9 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { desc, eq, inArray } from "drizzle-orm";
-import { auth } from "@/lib/auth";
-import { db } from "@/db/drizzle";
-import { game, gamePlayers } from "@/db/schema";
+import { auth } from "@/features/auth/server/auth";
+import { db } from "@/lib/db/drizzle";
+import { game, gamePlayers } from "@/lib/db/schema";
 import { Button } from "@/components/ui/button";
 
 export default async function HistoryPage() {

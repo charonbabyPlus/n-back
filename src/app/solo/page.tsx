@@ -1,9 +1,9 @@
 import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { SoloGame } from "@/components/game/SoloGame";
-import { generateSequence } from "@/game/sequence";
+import { auth } from "@/features/auth/server/auth";
+import { SoloGame } from "@/features/game/client/solo-game";
+import { generateSequence } from "@/features/game/shared/sequence";
 import { Button } from "@/components/ui/button";
 
 export default async function SoloPage() {

@@ -3,7 +3,7 @@ import {
   generateSequence,
   computeCurrentStimulusIndex,
   isGameOver,
-} from "@/game/sequence";
+} from "@/features/game/shared/sequence";
 
 describe("generateSequence", () => {
   it("generates correct length", () => {

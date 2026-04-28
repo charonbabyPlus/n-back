@@ -2,11 +2,16 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
-import { auth } from "@/lib/auth";
-import { db } from "@/db/drizzle";
-import { game } from "@/db/schema";
+import { auth } from "@/features/auth/server/auth";
+import { db } from "@/lib/db/drizzle";
+import { game } from "@/lib/db/schema";
 import { Button } from "@/components/ui/button";
 import { AutoRefresh } from "@/components/auto-refresh";
+import {
+  createGameAction,
+  joinGameAction,
+  dissolveGameAction,
+} from "@/features/game/server/actions";
 
 async function requireSession() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -35,7 +40,7 @@ export default async function GameListPage() {
           <Link href="/dashboard">← Back</Link>
         </Button>
         <div className="ml-auto" />
-        <form action="/game/create" method="post">
+        <form action={createGameAction}>
           <Button type="submit">+ New Game</Button>
         </form>
       </div>
@@ -99,7 +104,7 @@ export default async function GameListPage() {
                   </div>
 
                   {isHost ? (
-                    <form action="/game/dissolve" method="post">
+                    <form action={dissolveGameAction}>
                       <input type="hidden" name="gameId" value={g.id} />
                       <Button size="sm" variant="outline" type="submit">
                         Dissolve
@@ -110,7 +115,7 @@ export default async function GameListPage() {
                       <Link href={`/game/${g.id}`}>Open</Link>
                     </Button>
                   ) : (
-                    <form action="/game/join" method="post">
+                    <form action={joinGameAction}>
                       <input type="hidden" name="gameId" value={g.id} />
                       <Button size="sm" type="submit" disabled={isFull}>
                         {isFull ? "Full" : "Join"}

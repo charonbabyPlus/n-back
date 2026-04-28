@@ -2,13 +2,18 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { headers } from "next/headers";
 import { eq } from "drizzle-orm";
-import { auth } from "@/lib/auth";
-import { db } from "@/db/drizzle";
-import { game } from "@/db/schema";
+import { auth } from "@/features/auth/server/auth";
+import { db } from "@/lib/db/drizzle";
+import { game } from "@/lib/db/schema";
 import { Button } from "@/components/ui/button";
-import { catchUpMissedAnswers } from "@/server/game-service";
-import { Playing } from "@/components/game/Playing";
+import { catchUpMissedAnswers } from "@/features/game/server/service";
+import { Playing } from "@/features/game/client/playing";
 import { AutoRefresh } from "@/components/auto-refresh";
+import {
+  startGameAction,
+  dissolveGameAction,
+  leaveGameAction,
+} from "@/features/game/server/actions";
 
 async function requireSession() {
   const session = await auth.api.getSession({ headers: await headers() });
@@ -97,7 +102,7 @@ export default async function GameRoomPage({
 
           {isFreshHost ? (
             <div className="flex flex-col items-center gap-3">
-              <form action="/game/start" method="post">
+              <form action={startGameAction}>
                 <input type="hidden" name="gameId" value={gameId} />
                 <Button
                   type="submit"
@@ -108,13 +113,13 @@ export default async function GameRoomPage({
                   : "Start Game"}
                 </Button>
               </form>
-              <form action="/game/dissolve" method="post">
+              <form action={dissolveGameAction}>
                 <input type="hidden" name="gameId" value={gameId} />
                 <Button type="submit" variant="outline">
                   Dissolve Lobby
                 </Button>
               </form>
-              <form action="/game/leave" method="post">
+              <form action={leaveGameAction}>
                 <input type="hidden" name="gameId" value={gameId} />
                 <Button type="submit" variant="ghost">
                   Leave Lobby
@@ -126,7 +131,7 @@ export default async function GameRoomPage({
               <p className="text-sm text-muted-foreground animate-pulse">
                 Waiting for host to start…
               </p>
-              <form action="/game/leave" method="post">
+              <form action={leaveGameAction}>
                 <input type="hidden" name="gameId" value={gameId} />
                 <Button type="submit" variant="outline">
                   Leave Lobby

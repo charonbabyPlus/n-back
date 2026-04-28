@@ -3,7 +3,7 @@ import {
   evaluateAnswer,
   shouldTriggerSpeedChange,
   computeNextIntervalMs,
-} from "@/game/scoring";
+} from "@/features/game/shared/scoring";
 
 // sequence: [3, 1, 3, 5, 3], n=2
 // matches at index 2 (3===3) and index 4 (3===3)
